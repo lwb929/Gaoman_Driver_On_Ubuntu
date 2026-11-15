@@ -1,0 +1,13 @@
+[Unit]
+Description=GAOMON 1060PRO pen button fix (uinput proxy + WebUI)
+After=multi-user.target
+
+[Service]
+# 直接执行 /usr/local/lib 下的 python 文件，不要写 `python3 /usr/local/bin/gaomon-penfix`。
+# 那个路径是 sh 启动器（给命令行手工用的），交给 python3 解析会 SyntaxError 并无限重启。
+ExecStart=/usr/bin/python3 /usr/local/lib/gaomon-penfix/gaomon-penfix.py --web --web-port 8848
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

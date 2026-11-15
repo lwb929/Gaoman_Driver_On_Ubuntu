@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GAOMON 1060PRO · penfix 控制台</title>
+<style>
+  :root{
+    --bg:#0e1013; --panel:#151a1f; --panel2:#1b2128; --line:#252d36;
+    --ink:#e6ebef; --dim:#8b98a5; --dimmer:#5f6b78;
+    --cy:#4fd1c5; --cy-d:#2a7f78; --am:#e8a33d; --rd:#e05c5c; --gr:#5ac47f;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font:14px/1.55 system-ui,-apple-system,"Segoe UI","Noto Sans CJK SC",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding:22px 26px 60px;
+    max-width:1240px; margin:0 auto;
+  }
+  h1{font-size:17px;font-weight:600;letter-spacing:.2px;margin:0}
+  .sub{color:var(--dimmer);font-size:12px;font-family:var(--mono);margin-top:3px}
+
+  /* ---------- 顶栏 ---------- */
+  header{display:flex;align-items:flex-start;justify-content:space-between;
+    gap:20px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-bottom:22px;flex-wrap:wrap}
+  .stats{display:flex;gap:0;font-family:var(--mono);font-size:11.5px}
+  .stat{padding:0 14px;border-left:1px solid var(--line)}
+  .stat:first-child{border-left:0;padding-left:0}
+  .stat b{display:block;color:var(--ink);font-size:13px;font-weight:600;letter-spacing:-.2px}
+  .stat span{color:var(--dimmer);text-transform:uppercase;letter-spacing:.09em;font-size:9.5px}
+  .dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px;vertical-align:1px}
+  .dot.ok{background:var(--gr);box-shadow:0 0 6px var(--gr)}
+  .dot.warn{background:var(--am)}
+  .dot.bad{background:var(--rd)}
+
+  /* ---------- 布局 ---------- */
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:22px;align-items:start}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:18px 20px 20px}
+  .card h2{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--dim);margin:0 0 16px;display:flex;align-items:center;justify-content:space-between}
+  .card h2 em{font-style:normal;color:var(--dimmer);font-size:10.5px;letter-spacing:.04em;
+    text-transform:none;font-family:var(--mono)}
+
+  /* ---------- 曲线编辑 ---------- */
+  .canvas-wrap{position:relative;background:var(--panel2);border:1px solid var(--line);border-radius:2px}
+  #curve{display:block;width:100%;height:auto;cursor:crosshair;touch-action:none}
+  .legend{display:flex;gap:16px;font-family:var(--mono);font-size:10.5px;color:var(--dimmer);
+    margin-top:9px;justify-content:space-between}
+  .legend kbd{background:var(--panel2);border:1px solid var(--line);border-radius:2px;
+    padding:1px 5px;color:var(--dim);font-family:var(--mono);font-size:10px}
+
+  .presets{display:flex;gap:6px;margin-top:14px;flex-wrap:wrap}
+  .presets button{flex:1 1 0;min-width:64px}
+  button{
+    background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+    border-radius:2px;padding:7px 12px;font:inherit;font-size:12px;cursor:pointer;
+    transition:border-color .12s,background .12s,color .12s;
+  }
+  button:hover{border-color:var(--cy-d);color:#fff}
+  button:active{background:#232b33}
+  button.primary{background:var(--cy);color:#06201e;border-color:var(--cy);font-weight:600}
+  button.primary:hover{background:#5fe0d3;color:#06201e}
+  button.ghost{background:transparent}
+  button.sm{padding:4px 9px;font-size:11px;white-space:nowrap;flex-shrink:0}
+  button[disabled]{opacity:.4;cursor:not-allowed}
+
+  /* ---------- 滑块 ---------- */
+  .ctl{display:grid;grid-template-columns:auto 1fr auto;gap:10px 12px;align-items:center;margin-top:16px}
+  .ctl label{font-size:11.5px;color:var(--dim);letter-spacing:.02em}
+  .ctl output{font-family:var(--mono);font-size:11.5px;color:var(--cy);text-align:right;min-width:56px}
+  input[type=range]{-webkit-appearance:none;appearance:none;background:transparent;height:16px;width:100%;margin:0}
+  input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--line);border-radius:1px}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;
+    background:var(--cy);border-radius:50%;margin-top:-4.5px;cursor:pointer;border:0}
+  input[type=range]::-moz-range-track{height:2px;background:var(--line)}
+  input[type=range]::-moz-range-thumb{width:11px;height:11px;background:var(--cy);
+    border-radius:50%;border:0;cursor:pointer}
+
+  /* ---------- 按键网格 ---------- */
+  .keys{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:9px}
+  .key{background:var(--panel2);border:1px solid var(--line);border-radius:2px;padding:10px 11px;
+    display:flex;flex-direction:column;gap:8px;transition:border-color .12s}
+  .key.learning{border-color:var(--am);box-shadow:0 0 0 1px var(--am) inset}
+  .key.bound{border-color:var(--cy-d)}
+  .key-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .key-name{font-size:12.5px;font-weight:600;letter-spacing:.01em}
+  .key-code{font-family:var(--mono);font-size:10px;color:var(--dimmer)}
+  .key-row{display:flex;gap:5px;align-items:center}
+  select,input[type=text]{background:#0f1317;color:var(--ink);border:1px solid var(--line);
+    border-radius:2px;padding:5px 7px;font:inherit;font-size:11.5px;width:100%;min-width:0}
+  select:focus,input:focus{outline:none;border-color:var(--cy-d)}
+  .empty{color:var(--dimmer);font-size:12px;padding:14px 2px;font-style:italic}
+
+  /* 空状态与「学习新按键」都要横跨整行，否则会被 grid 挤成半栏 */
+  .keys > .empty,.keys > .addkey{grid-column:1/-1}
+  .keys > .empty{
+    font-style:normal;color:var(--dim);background:var(--panel2);
+    border:1px solid var(--line);border-radius:2px;
+    padding:22px 18px;text-align:center;line-height:1.7;
+  }
+  .keys > .empty b{color:var(--ink);font-weight:600;display:block;margin-bottom:4px;font-size:12.5px}
+  button.addkey{
+    width:100%;background:transparent;border-style:dashed;color:var(--dim);
+  }
+  button.addkey:hover{color:var(--cy);border-color:var(--cy-d)}
+
+  /* ---------- 底部 ---------- */
+  .bar{position:fixed;bottom:0;left:0;right:0;background:rgba(14,16,19,.94);
+    border-top:1px solid var(--line);padding:11px 26px;display:flex;align-items:center;
+    justify-content:space-between;gap:16px;backdrop-filter:blur(8px);z-index:10}
+  .bar .msg{font-family:var(--mono);font-size:11.5px;color:var(--dim);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bar .msg.err{color:var(--rd)} .bar .msg.ok{color:var(--gr)}
+  .bar .act{display:flex;gap:8px;flex-shrink:0}
+  .warnbox{background:rgba(232,163,61,.08);border:1px solid rgba(232,163,61,.3);
+    border-left:3px solid var(--am);border-radius:2px;padding:10px 13px;font-size:12px;
+    color:#f0c98a;margin-bottom:16px;line-height:1.5}
+  .warnbox b{color:var(--am)}
+  .hint{font-size:11.5px;color:var(--dimmer);margin-top:10px;line-height:1.5}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>GAOMON 1060PRO <span style="color:var(--dimmer);font-weight:400">· penfix</span></h1>
+    <div class="sub" id="devline">正在连接守护进程…</div>
+  </div>
+  <div class="stats">
+    <div class="stat"><span>设备</span><b id="s-dev">—</b></div>
+    <div class="stat"><span>事件</span><b id="s-events">—</b></div>
+    <div class="stat"><span>帧率</span><b id="s-rate">—</b></div>
+    <div class="stat"><span>按键独占</span><b id="s-grab">—</b></div>
+  </div>
+</header>
+
+<div id="warn"></div>
+
+<div class="grid">
+  <!-- 压感 -->
+  <section class="card">
+    <h2>压感曲线 <em id="cv-hint">拖动控制点调整</em></h2>
+    <div class="canvas-wrap">
+      <canvas id="curve" width="620" height="440"></canvas>
+    </div>
+    <div class="legend">
+      <span>横轴 = 施加力度</span>
+      <span id="cv-readout">—</span>
+      <span>纵轴 = 输出压力</span>
+    </div>
+
+    <div class="presets">
+      <button data-preset="linear">线性</button>
+      <button data-preset="soft">轻触（软）</button>
+      <button data-preset="hard">重压（硬）</button>
+      <button data-preset="s">S 形</button>
+      <button class="ghost sm" id="btn-reset-pts">重置点</button>
+    </div>
+
+    <div class="ctl">
+      <label for="maxp">满压阈值</label>
+      <input type="range" id="maxp" min="10" max="100" step="1">
+      <output id="maxp-o">—</output>
+
+      <label for="gamma">灵敏度 γ</label>
+      <input type="range" id="gamma" min="30" max="200" step="5">
+      <output id="gamma-o">—</output>
+
+      <label for="dead">起笔死区</label>
+      <input type="range" id="dead" min="0" max="800" step="10">
+      <output id="dead-o">—</output>
+    </div>
+    <div class="hint">满压阈值越低，越轻的笔触就能画出最粗的线。γ&lt;1 更灵敏，γ&gt;1 更需用力。</div>
+  </section>
+
+  <!-- 按键 -->
+  <section class="card">
+    <h2>物理按键映射 <em id="key-count">—</em></h2>
+    <div id="keylist" class="keys"></div>
+    <div class="hint" style="margin-top:14px">
+      点「学习」再按板子上的键，自动识别键码。学习模式下按键不会触发任何动作。
+    </div>
+  </section>
+
+  <!-- 多屏映射 -->
+  <section class="card">
+    <h2>多屏映射 <em id="map-resolved">—</em></h2>
+    <div class="row" style="display:flex;gap:18px;flex-wrap:wrap;align-items:end">
+      <div>
+        <div class="hint" style="margin-bottom:6px">板子映射到</div>
+        <select id="map-output" style="background:var(--panel);color:var(--fg);
+          border:1px solid var(--line);padding:7px 10px;border-radius:2px;min-width:180px">
+          <option value="*">整个桌面（KDE 默认）</option>
+        </select>
+      </div>
+      <div>
+        <div class="hint" style="margin-bottom:6px">板面旋转</div>
+        <select id="map-rotate" style="background:var(--panel);color:var(--fg);
+          border:1px solid var(--line);padding:7px 10px;border-radius:2px">
+          <option value="0">0°</option>
+          <option value="90">90°</option>
+          <option value="180">180°</option>
+          <option value="270">270°</option>
+        </select>
+      </div>
+      <div>
+        <div class="hint" style="margin-bottom:6px">目标屏内投影区域</div>
+        <select id="map-dst" style="background:var(--panel);color:var(--fg);
+          border:1px solid var(--line);padding:7px 10px;border-radius:2px">
+          <option value="full">整屏</option>
+          <option value="top">上半屏（竖屏横向）</option>
+          <option value="bottom">下半屏（竖屏横向）</option>
+          <option value="left">左半屏</option>
+          <option value="right">右半屏</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:22px;flex-wrap:wrap;margin-top:16px">
+      <div>
+        <div class="hint" style="margin-bottom:6px">板面使用区域（拖拽框选，双击恢复全板）</div>
+        <canvas id="map-region" width="300" height="188"
+          style="border:1px solid var(--line);border-radius:2px;cursor:crosshair;touch-action:none"></canvas>
+        <div class="hint" id="map-region-label" style="margin-top:6px">全板</div>
+        <div class="hint" style="margin-top:4px;display:grid;grid-template-columns:auto auto;gap:2px 10px">
+          <label>x <input id="map-x0" type="number" min="0" max="100" style="width:52px;background:var(--panel);color:var(--fg);border:1px solid var(--line);padding:2px 4px"> – <input id="map-x1" type="number" min="0" max="100" style="width:52px;background:var(--panel);color:var(--fg);border:1px solid var(--line);padding:2px 4px"> %</label>
+          <label>y <input id="map-y0" type="number" min="0" max="100" style="width:52px;background:var(--panel);color:var(--fg);border:1px solid var(--line);padding:2px 4px"> – <input id="map-y1" type="number" min="0" max="100" style="width:52px;background:var(--panel);color:var(--fg);border:1px solid var(--line);padding:2px 4px"> %</label>
+        </div>
+      </div>
+      <div>
+        <div class="hint" style="margin-bottom:6px">当前桌面布局（目标屏高亮）</div>
+        <canvas id="map-preview" width="300" height="188"
+          style="border:1px solid var(--line);border-radius:2px"></canvas>
+      </div>
+    </div>
+    <div class="hint" style="margin-top:12px">
+      目标屏与旋转会写入 KDE 的 kcminputrc 并重建虚拟设备（立即生效，无需拔插）。
+      竖屏选 90° 或 270°：方向反了就换另一个。区域框选只影响 penfix 侧的
+      板面裁剪，选中区域拉伸铺满目标屏。
+    </div>
+  </section>
+</div>
+
+<div class="bar">
+  <div class="msg" id="msg">就绪</div>
+  <div class="act">
+    <button class="ghost sm" id="btn-reload">重新读取</button>
+    <button class="primary" id="btn-apply">应用并保存</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const api = async (path, body) => {
+  const opt = body === undefined ? {} :
+    {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)};
+  const r = await fetch(path, opt);
+  const t = await r.text();
+  let j; try { j = JSON.parse(t); } catch { throw new Error(t.slice(0,300)); }
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+};
+
+let CFG = null;          // 当前编辑中的配置
+let STATUS = null;
+let dragging = null;     // 正在拖的控制点索引
+let lastEventCount = 0, lastRateT = 0;
+
+/* ================= 曲线绘制 ================= */
+const cv = $('#curve'), ctx = cv.getContext('2d');
+const PAD = {l:46, r:18, t:18, b:32};
+const BASE_H = 440;          // 逻辑高度，宽度跟随容器
+let LW = 620, LH = BASE_H;   // 逻辑画布尺寸
+
+function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+/* 按容器宽度与设备像素比重设画布，避免高分屏模糊 */
+function fitCanvas(){
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = Math.max(280, cv.parentElement.clientWidth - 2);
+  LW = Math.round(cssW);
+  LH = BASE_H;
+  cv.style.width = LW + 'px';
+  cv.style.height = LH + 'px';
+  cv.width  = Math.round(LW * dpr);
+  cv.height = Math.round(LH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function plot(){ return {
+  x0:PAD.l, y0:LH-PAD.b,
+  w:LW-PAD.l-PAD.r, h:LH-PAD.t-PAD.b
+};}
+
+function sx(nx){ const p=plot(); return p.x0 + nx*p.w; }
+function sy(ny){ const p=plot(); return p.y0 - ny*p.h; }
+
+function draw(){
+  try { drawInner(); } catch(e){ console.error('draw error', e); }
+}
+
+function drawInner(){
+  const p = plot(), W = LW, H = LH;
+  ctx.clearRect(0,0,W,H);
+
+  // 背景
+  ctx.fillStyle = css('--panel2'); ctx.fillRect(0,0,W,H);
+
+  // 网格
+  ctx.strokeStyle = css('--line'); ctx.lineWidth = 1;
+  for(let i=0;i<=5;i++){
+    const gx = p.x0 + p.w*i/5, gy = p.y0 - p.h*i/5;
+    ctx.globalAlpha = i===0 ? 1 : .45;
+    ctx.beginPath(); ctx.moveTo(gx, p.y0); ctx.lineTo(gx, p.t); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p.x0, gy); ctx.lineTo(p.x0+p.w, gy); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // 对角线（线性参考）
+  ctx.strokeStyle = 'rgba(139,152,165,.28)';
+  ctx.setLineDash([3,4]);
+  ctx.beginPath(); ctx.moveTo(sx(0), sy(0)); ctx.lineTo(sx(1), sy(1)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 曲线
+  const pts = (CFG?.pressure?.points) || [[0,0],[1,1]];
+  ctx.strokeStyle = css('--cy'); ctx.lineWidth = 2;
+  ctx.beginPath();
+  for(let i=0;i<=240;i++){
+    const t = i/240;
+    const y = interp(pts, t);
+    const X = sx(t), Y = sy(Math.min(1,Math.max(0,y)));
+    i ? ctx.lineTo(X,Y) : ctx.moveTo(X,Y);
+  }
+  ctx.stroke();
+
+  // 填充
+  ctx.lineTo(sx(1), sy(0)); ctx.lineTo(sx(0), sy(0)); ctx.closePath();
+  const g = ctx.createLinearGradient(0, PAD.t, 0, p.y0);
+  g.addColorStop(0,'rgba(79,209,197,.20)');
+  g.addColorStop(1,'rgba(79,209,197,.02)');
+  ctx.fillStyle = g; ctx.fill();
+
+  // 控制点（首尾为固定端点，画成实心小方块以示锁定）
+  for(let i=0;i<pts.length;i++){
+    const X = sx(pts[i][0]), Y = sy(pts[i][1]);
+    const hot = dragging === i;
+    const locked = (i === 0 || i === pts.length - 1);
+    if(locked){
+      ctx.fillStyle = css('--dimmer');
+      ctx.fillRect(X-4, Y-4, 8, 8);
+      ctx.strokeStyle = hot ? css('--am') : css('--cy-d');
+      ctx.lineWidth = 1.5; ctx.strokeRect(X-4, Y-4, 8, 8);
+    } else {
+      ctx.beginPath(); ctx.arc(X,Y, hot?6.5:5, 0, 7);
+      ctx.fillStyle = hot ? css('--am') : '#0e1013';
+      ctx.fill();
+      ctx.strokeStyle = hot ? css('--am') : css('--cy');
+      ctx.lineWidth = 2; ctx.stroke();
+    }
+  }
+
+  // 轴标签
+  ctx.fillStyle = css('--dimmer');
+  ctx.font = '10px ' + css('--mono');
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for(let i=0;i<=5;i++){
+    ctx.fillText((i*20)+'%', p.x0-8, p.y0 - p.h*i/5);
+  }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for(let i=0;i<=5;i++){
+    ctx.fillText((i*20)+'%', p.x0 + p.w*i/5, p.y0+9);
+  }
+}
+
+function interp(pts, t){
+  const q = pts.slice().sort((a,b)=>a[0]-b[0]);
+  if(t <= q[0][0]) return q[0][1];
+  for(let i=0;i<q.length-1;i++){
+    const [x0,y0]=q[i], [x1,y1]=q[i+1];
+    if(t <= x1){
+      if(x1===x0) return y1;
+      return y0 + (y1-y0)*(t-x0)/(x1-x0);
+    }
+  }
+  return q[q.length-1][1];
+}
+
+/* 坐标换算（考虑 canvas CSS 缩放） */
+function canvasPos(ev){
+  const r = cv.getBoundingClientRect();
+  const x = (ev.clientX - r.left) * (LW / r.width);
+  const y = (ev.clientY - r.top)  * (LH / r.height);
+  return {x, y};
+}
+
+function normPos(x, y){
+  const p = plot();
+  return {
+    nx: Math.min(1, Math.max(0, (x - p.x0) / p.w)),
+    ny: Math.min(1, Math.max(0, (p.y0 - y) / p.h))
+  };
+}
+
+cv.addEventListener('pointerdown', ev => {
+  if(!CFG) return;
+  const {x,y} = canvasPos(ev);
+  const pts = CFG.pressure.points;
+  let best = -1, bestD = 18;
+  for(let i=0;i<pts.length;i++){
+    const d = Math.hypot(sx(pts[i][0]) - x, sy(pts[i][1]) - y);
+    if(d < bestD){ bestD = d; best = i; }
+  }
+  const {nx,ny} = normPos(x,y);
+  if(best < 0){
+    // 新增点：两端各留 2% 余量，避免插到端点外侧造成 x 重复
+    if(nx <= 0.02 || nx >= 0.98){ cv.setPointerCapture(ev.pointerId); return; }
+    const qx = +nx.toFixed(3);          // 与存入的值保持一致，否则定位失败
+    pts.push([qx, +ny.toFixed(3)]);
+    pts.sort((a,b)=>a[0]-b[0]);
+    best = pts.findIndex(q => q[0] === qx);
+    if(best <= 0 || best >= pts.length-1){ dragging = null; draw(); return; }
+    // 新点的 y 也夹在左右邻点之间，否则一插入就倒挂
+    const ylo = Math.min(pts[best-1][1], pts[best+1][1]);
+    const yhi = Math.max(pts[best-1][1], pts[best+1][1]);
+    pts[best][1] = +Math.min(yhi, Math.max(ylo, pts[best][1])).toFixed(3);
+  }
+  dragging = best;
+  cv.setPointerCapture(ev.pointerId);
+  draw(); syncSliders();
+});
+
+cv.addEventListener('pointermove', ev => {
+  if(dragging === null || !CFG) return;
+  const {x,y} = canvasPos(ev);
+  const {nx,ny} = normPos(x,y);
+  const pts = CFG.pressure.points;
+  const last = pts.length - 1;
+  // 端点固定为 (0,0) 与 (1,1)：保证悬停零压力、满力满压。
+  // 想更早达到满压请调「满压阈值」滑块，而不是拖端点。
+  if(dragging <= 0 || dragging >= last) return;
+  const lo = pts[dragging-1][0] + 0.01;
+  const hi = pts[dragging+1][0] - 0.01;
+  // y 必须夹在左右邻点之间，否则曲线会倒挂（越用力越淡）
+  const ylo = Math.min(pts[dragging-1][1], pts[dragging+1][1]);
+  const yhi = Math.max(pts[dragging-1][1], pts[dragging+1][1]);
+  pts[dragging][0] = +Math.min(hi, Math.max(lo, nx)).toFixed(3);
+  pts[dragging][1] = +Math.min(yhi, Math.max(ylo, ny)).toFixed(3);
+  draw(); updateReadout();
+});
+
+cv.addEventListener('pointerup', ev => {
+  dragging = null;
+  try{ cv.releasePointerCapture(ev.pointerId); }catch{}
+  draw(); updateReadout(); syncSliders();
+});
+
+cv.addEventListener('dblclick', ev => {
+  if(!CFG) return;
+  const {x,y} = canvasPos(ev);
+  const pts = CFG.pressure.points;
+  for(let i=1;i<pts.length-1;i++){
+    if(Math.hypot(sx(pts[i][0])-x, sy(pts[i][1])-y) < 14){
+      pts.splice(i,1); draw(); syncSliders(); return;
+    }
+  }
+});
+
+/* ================= 滑块 ================= */
+function syncSliders(){
+  if(!CFG) return;
+  const pr = CFG.pressure;
+  $('#maxp').value = Math.round(pr.max_pressure_pct);
+  $('#maxp-o').textContent = Math.round(pr.max_pressure_pct) + '%';
+  $('#gamma').value = Math.round(pr.gamma * 100);
+  $('#gamma-o').textContent = pr.gamma.toFixed(2);
+  $('#dead').value = pr.deadzone;
+  $('#dead-o').textContent = pr.deadzone;
+}
+
+function updateReadout(){
+  if(!CFG) return;
+  const pts = CFG.pressure.points;
+  const mx = CFG.pressure.max_pressure_pct/100;
+  const g = CFG.pressure.gamma;
+  const sample = t => {
+    let y = interp(pts, Math.min(1, t/mx));
+    if(g !== 1) y = Math.pow(Math.max(0,y), g);
+    return Math.round(Math.min(1,Math.max(0,y)) * 16383);
+  };
+  $('#cv-readout').textContent =
+    `40%力→${sample(.4)}  70%→${sample(.7)}  100%→${sample(1)}`;
+}
+
+$('#maxp').addEventListener('input', e => {
+  CFG.pressure.max_pressure_pct = +e.target.value;
+  $('#maxp-o').textContent = e.target.value + '%';
+  draw(); updateReadout();
+});
+$('#gamma').addEventListener('input', e => {
+  CFG.pressure.gamma = +e.target.value / 100;
+  $('#gamma-o').textContent = CFG.pressure.gamma.toFixed(2);
+  draw(); updateReadout();
+});
+$('#dead').addEventListener('input', e => {
+  CFG.pressure.deadzone = +e.target.value;
+  $('#dead-o').textContent = e.target.value;
+  updateReadout();
+});
+
+const PRESETS = {
+  linear:[[0,0],[.333,.333],[.667,.667],[1,1]],
+  soft:[[0,0],[.333,.62],[.667,.85],[1,1]],
+  hard:[[0,0],[.333,.10],[.667,.38],[1,1]],
+  s:[[0,0],[.25,.08],[.75,.92],[1,1]]
+};
+document.querySelectorAll('[data-preset]').forEach(b => {
+  b.addEventListener('click', () => {
+    CFG.pressure.points = PRESETS[b.dataset.preset].map(p => p.slice());
+    draw(); syncSliders(); updateReadout();
+  });
+});
+$('#btn-reset-pts').addEventListener('click', () => {
+  CFG.pressure.points = PRESETS.linear.map(p => p.slice());
+  CFG.pressure.max_pressure_pct = 100;
+  CFG.pressure.gamma = 1;
+  CFG.pressure.deadzone = 0;
+  draw(); syncSliders(); updateReadout();
+});
+
+/* ================= 按键 ================= */
+const ACTIONS = [
+  ['none','— 无动作（吞掉）'],
+  ['key','键盘组合键'],
+  ['mouse','鼠标按键'],
+  ['wheel','滚轮'],
+  ['cmd','执行命令'],
+];
+
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function renderKeys(){
+  const box = $('#keylist');
+  const map = CFG.buttons.map || {};
+  const labels = CFG.labels || {};
+  const ids = Object.keys(map).concat(Object.keys(labels).filter(k => !(k in map)));
+  // 去重 + 排序（数字键码优先，按数值）
+  const uniq = [...new Set(ids)].sort((a,b) => {
+    const na = /^\d+$/.test(a), nb = /^\d+$/.test(b);
+    if(na && nb) return +a - +b;
+    if(na) return -1; if(nb) return 1;
+    return a.localeCompare(b);
+  });
+
+  const bound = uniq.filter(k => (map[k]?.type || 'none') !== 'none').length;
+  $('#key-count').textContent = uniq.length ? `${bound}/${uniq.length} 已绑定` : '尚未学习任何按键';
+
+  if(!uniq.length){
+    box.innerHTML = '<div class="empty"><b>还没有识别到任何按键</b>' +
+      '点下面的按钮，然后按下板子上的物理键，键码会被自动识别。</div>';
+  } else {
+    box.innerHTML = uniq.map(id => {
+      const act = map[id] || {type:'none'};
+      const nm = labels[id] || (id.startsWith('code') ? id : ('键 ' + id));
+      const t = act.type || 'none';
+      return `<div class="key ${t!=='none'?'bound':''}" data-id="${esc(id)}">
+        <div class="key-top">
+          <span class="key-name">${esc(nm)}</span>
+          <span class="key-code">${esc(id)}</span>
+        </div>
+        <div class="key-row">
+          <select data-f="type">${ACTIONS.map(([v,l]) =>
+            `<option value="${v}"${v===t?' selected':''}>${l}</option>`).join('')}</select>
+          <button class="sm" data-act="learn">学习</button>
+        </div>
+        <div class="key-row" data-extra></div>
+      </div>`;
+    }).join('');
+    box.querySelectorAll('.key').forEach(el => wireKey(el));
+  }
+
+  const add = document.createElement('button');
+  add.className = 'ghost addkey';
+  add.textContent = '＋ 学习新按键';
+  add.addEventListener('click', learnNew);
+  box.appendChild(add);
+}
+
+function wireKey(el){
+  const id = el.dataset.id;
+  const sel = el.querySelector('[data-f="type"]');
+  const extra = el.querySelector('[data-extra]');
+  // 确保 map 有条目
+  if(!CFG.buttons.map[id]) CFG.buttons.map[id] = {type:'none'};
+  const act = CFG.buttons.map[id];
+
+  const paintExtra = () => {
+    const t = sel.value;
+    act.type = t;
+    el.classList.toggle('bound', t !== 'none');
+    if(t === 'key'){
+      extra.innerHTML = `<input type="text" placeholder="如 ctrl+z" data-f="combo">`;
+      const inp = extra.querySelector('[data-f="combo"]');
+      inp.value = act.combo || '';
+      inp.addEventListener('input', () => { act.combo = inp.value; });
+    } else if(t === 'mouse'){
+      extra.innerHTML = `<select data-f="button">${
+        ['left','right','middle','back','forward'].map(b =>
+          `<option value="${b}"${(act.button||'left')===b?' selected':''}>${
+            {left:'左键',right:'右键',middle:'中键',back:'后退',forward:'前进'}[b]}</option>`).join('')}</select>`;
+      const s2 = extra.querySelector('[data-f="button"]');
+      act.button = s2.value;
+      s2.addEventListener('change', () => { act.button = s2.value; });
+    } else if(t === 'wheel'){
+      extra.innerHTML = `<select data-f="amount">
+        <option value="1">向上滚</option><option value="-1">向下滚</option></select>`;
+      const s3 = extra.querySelector('[data-f="amount"]');
+      act.amount = +(act.amount || 1);
+      s3.value = String(act.amount);
+      s3.addEventListener('change', () => { act.amount = +s3.value; });
+    } else if(t === 'cmd'){
+      extra.innerHTML = `<input type="text" placeholder="shell 命令" data-f="command">`;
+      const inp = extra.querySelector('[data-f="command"]');
+      inp.value = act.command || '';
+      inp.addEventListener('input', () => { act.command = inp.value; });
+    } else {
+      extra.innerHTML = '';
+    }
+  };
+  sel.addEventListener('change', paintExtra);
+  paintExtra();
+
+  el.querySelector('[data-act="learn"]').addEventListener('click', async () => {
+    el.classList.add('learning');
+    setMsg(`等待按键… 请按板子上要绑定的键（${id} 将被替换/确认）`, '');
+    try{
+      const r = await api('/api/learn', {timeout:12});
+      const nid = String(r.code);
+      CFG.labels[nid] = CFG.labels[nid] || r.name;
+      if(!CFG.buttons.map[nid]) CFG.buttons.map[nid] = {type:'none'};
+      // 如果是新键，删掉占位的空条目
+      if(act.type === 'none' && id !== nid) delete CFG.buttons.map[id];
+      renderKeys();
+      setMsg(`识别到 ${r.name}（code ${r.code}）`, 'ok');
+    }catch(e){
+      setMsg('学习失败: ' + e.message, 'err');
+    }finally{
+      el.classList.remove('learning');
+    }
+  });
+}
+
+async function learnNew(){
+  setMsg('等待按键… 请按板子上任意一个物理键', '');
+  try{
+    const r = await api('/api/learn', {timeout:12});
+    const id = String(r.code);
+    CFG.labels[id] = CFG.labels[id] || r.name;
+    if(!CFG.buttons.map[id]) CFG.buttons.map[id] = {type:'none'};
+    renderKeys();
+    setMsg(`识别到 ${r.name}（code ${r.code}）`, 'ok');
+  }catch(e){
+    setMsg('学习失败: ' + e.message, 'err');
+  }
+}
+
+/* ================= 多屏映射 ================= */
+const mapRegion = $('#map-region'), mapPreview = $('#map-preview');
+let mapDragging = false;          // 拖拽中：轮询不覆盖 region
+
+function mapCfg(){
+  CFG.map = CFG.map || { output: '*', rotate: 0, region: [0, 0, 1, 1],
+                         dst_region: [0, 0, 1, 1] };
+  if (!Array.isArray(CFG.map.region) || CFG.map.region.length !== 4)
+    CFG.map.region = [0, 0, 1, 1];
+  if (!Array.isArray(CFG.map.dst_region) || CFG.map.dst_region.length !== 4)
+    CFG.map.dst_region = [0, 0, 1, 1];
+  return CFG.map;
+}
+
+const DST_PRESETS = {
+  full:   [0, 0, 1, 1],
+  top:    [0, 0, 1, 0.5],
+  bottom: [0, 0.5, 1, 1],
+  left:   [0, 0, 0.5, 1],
+  right:  [0.5, 0, 1, 1],
+};
+function dstPresetOf(r){
+  for(const [k, v] of Object.entries(DST_PRESETS))
+    if(r.every((t, i) => Math.abs(t - v[i]) < 1e-6)) return k;
+  return 'full';
+}
+
+function drawRegionCanvas(){
+  const c = mapRegion, g = c.getContext('2d');
+  const r = mapCfg().region;
+  const W = c.width, H = c.height;
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = '#10151a'; g.fillRect(0, 0, W, H);
+  g.strokeStyle = 'rgba(255,255,255,.06)';
+  g.beginPath();
+  for(let i = 1; i < 8; i++){ g.moveTo(i*W/8, 0); g.lineTo(i*W/8, H); }
+  for(let i = 1; i < 5; i++){ g.moveTo(0, i*H/5); g.lineTo(W, i*H/5); }
+  g.stroke();
+  const x0 = r[0]*W, y0 = r[1]*H, w = (r[2]-r[0])*W, h = (r[3]-r[1])*H;
+  g.fillStyle = 'rgba(80,220,190,.12)';
+  g.strokeStyle = '#50dcbe'; g.lineWidth = 1.5;
+  g.fillRect(x0, y0, w, h); g.strokeRect(x0+.5, y0+.5, w-1, h-1);
+  const pct = v => Math.round(v*100);
+  $('#map-region-label').textContent =
+    (r[0]<=0 && r[1]<=0 && r[2]>=1 && r[3]>=1) ? '全板'
+      : `x ${pct(r[0])}%–${pct(r[2])}% · y ${pct(r[1])}%–${pct(r[3])}%`;
+}
+
+function drawPreviewCanvas(st){
+  const c = mapPreview, g = c.getContext('2d');
+  const outs = (st.map && st.map.outputs) || [];
+  const W = c.width, H = c.height, pad = 10;
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = '#10151a'; g.fillRect(0, 0, W, H);
+  if(!outs.length){
+    g.fillStyle = '#5a6a75'; g.font = '12px monospace';
+    g.fillText('无输出信息', 90, H/2);
+    return;
+  }
+  const bx0 = Math.min(...outs.map(o=>o.x)), by0 = Math.min(...outs.map(o=>o.y));
+  const bw = Math.max(...outs.map(o=>o.x+o.w)) - bx0;
+  const bh = Math.max(...outs.map(o=>o.y+o.h)) - by0;
+  const s = Math.min((W-2*pad)/bw, (H-2*pad)/bh);
+  const ox = (W - bw*s)/2 - bx0*s, oy = (H - bh*s)/2 - by0*s;
+  const target = mapCfg().output;
+  for(const o of outs){
+    const hit = (target === '*' ) || o.name === target || o.uuid === target;
+    const x = ox + o.x*s, y = oy + o.y*s, w = o.w*s, h = o.h*s;
+    if(hit){
+      const dr = mapCfg().dst_region;
+      const dx = x + dr[0]*w, dy = y + dr[1]*h, dw = (dr[2]-dr[0])*w, dh = (dr[3]-dr[1])*h;
+      g.fillStyle = 'rgba(80,220,190,.14)'; g.fillRect(dx, dy, dw, dh);
+      g.setLineDash([4,3]); g.strokeStyle = 'rgba(80,220,190,.7)';
+      g.strokeRect(dx+.5, dy+.5, dw-1, dh-1); g.setLineDash([]);
+    }
+    g.strokeStyle = hit ? '#50dcbe' : 'rgba(255,255,255,.22)';
+    g.lineWidth = hit ? 1.6 : 1;
+    g.strokeRect(x+.5, y+.5, w-1, h-1);
+    g.fillStyle = hit ? '#50dcbe' : '#5a6a75';
+    g.font = '11px monospace';
+    g.fillText(o.name, x+6, y+14);
+  }
+}
+
+function renderMapOptions(st){
+  const sel = $('#map-output');
+  const cur = sel.value || mapCfg().output || '*';
+  const opts = [['*', '整个桌面（KDE 默认）']];
+  for(const o of (st.map && st.map.outputs) || []){
+    const portrait = o.h > o.w;
+    opts.push([o.name, `${o.name}（${o.w}x${o.h}${portrait ? '，竖屏' : ''}）`]);
+  }
+  sel.innerHTML = opts.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+  sel.value = opts.some(([v]) => v === cur) ? cur : '*';
+  $('#map-rotate').value = String(mapCfg().rotate || 0);
+  $('#map-dst').value = dstPresetOf(mapCfg().dst_region);
+  const m = st.map || {};
+  $('#map-resolved').textContent = m.target === '*' ? 'KDE 默认'
+    : (m.resolved_name ? `→ ${m.resolved_name}` : '→ 目标屏不存在');
+  drawRegionCanvas();
+  drawPreviewCanvas(st);
+}
+
+// 画布框选：mousedown 起新框，拖动更新，mouseup 提交到 CFG
+(function(){
+  let sx = 0, sy = 0, active = false;
+  const pos = e => {
+    const b = mapRegion.getBoundingClientRect();
+    const p = e.touches ? e.touches[0] : e;
+    return [Math.min(1, Math.max(0, (p.clientX-b.left)/b.width)),
+            Math.min(1, Math.max(0, (p.clientY-b.top)/b.height))];
+  };
+  const start = e => { active = true; mapDragging = true;
+    [sx, sy] = pos(e); e.preventDefault(); };
+  const move = e => {
+    if(!active) return;
+    const [cx, cy] = pos(e);
+    let r = [Math.min(sx,cx), Math.min(sy,cy), Math.max(sx,cx), Math.max(sy,cy)];
+    if (r[2]-r[0] < .02 || r[3]-r[1] < .02)   // 太小视为误触：以点击点为中心的小框
+      r = [Math.max(0,sx-.01), Math.max(0,sy-.01), Math.min(1,sx+.01), Math.min(1,sy+.01)];
+    mapCfg().region = r;
+    drawRegionCanvas();
+    e.preventDefault();
+  };
+  const end = () => { if(!active) return; active = false; mapDragging = false;
+    syncRegionInputs(); };
+  const clear = () => { mapCfg().region = [0,0,1,1]; drawRegionCanvas(); syncRegionInputs(); };
+  mapRegion.addEventListener('mousedown', start);
+  window.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  mapRegion.addEventListener('touchstart', start, {passive:false});
+  mapRegion.addEventListener('touchmove', move, {passive:false});
+  mapRegion.addEventListener('touchend', end);
+  mapRegion.addEventListener('dblclick', clear);
+})();
+
+function syncRegionInputs(){
+  const r = mapCfg().region, pct = v => Math.round(v*100);
+  $('#map-x0').value = pct(r[0]); $('#map-x1').value = pct(r[2]);
+  $('#map-y0').value = pct(r[1]); $('#map-y1').value = pct(r[3]);
+}
+
+// 数字输入（键盘可达的备选）与 canvas 双向同步
+for(const [id, idx] of [['#map-x0',0],['#map-y0',1],['#map-x1',2],['#map-y1',3]]){
+  $(id).addEventListener('change', e => {
+    if(mapDragging) return;
+    const r = mapCfg().region.slice();
+    r[idx] = Math.min(100, Math.max(0, +e.target.value || 0)) / 100;
+    if(r[0] >= r[2] || r[1] >= r[3]) { syncRegionInputs(); return; }
+    mapCfg().region = r;
+    drawRegionCanvas();
+  });
+}
+
+$('#map-output').addEventListener('change', e => {
+  mapCfg().output = e.target.value;
+  // 选竖屏时自动预设 90°，省一次来回试
+  const o = (STATUS.map && STATUS.map.outputs || []).find(o => o.name === e.target.value);
+  if(o && o.h > o.w) { mapCfg().rotate = 90; $('#map-rotate').value = '90'; }
+  drawPreviewCanvas(STATUS);
+});
+$('#map-rotate').addEventListener('change', e => {
+  mapCfg().rotate = parseInt(e.target.value, 10) || 0;
+});
+$('#map-dst').addEventListener('change', e => {
+  mapCfg().dst_region = DST_PRESETS[e.target.value] || DST_PRESETS.full;
+  drawPreviewCanvas(STATUS);
+});
+
+/* ================= 状态轮询 ================= */
+async function poll(){
+  try{
+    const s = await api('/api/status');
+    STATUS = s;
+    renderMapOptions(s);
+    const now = Date.now();
+    const dc = s.button_event_count ?? 0;
+    let rate = '—';
+    if(lastRateT){
+      rate = Math.round((dc - lastEventCount) / ((now - lastRateT)/1000)) + '/s';
+    }
+    lastEventCount = dc; lastRateT = now;
+
+    $('#s-dev').innerHTML = s.pen_connected
+      ? `<span class="dot ok"></span>在线`
+      : `<span class="dot warn"></span>无信号`;
+    $('#s-events').textContent = s.frame_total ?? 0;
+    $('#s-rate').textContent = rate;
+    $('#s-grab').innerHTML = s.buttons_grabbed
+      ? `<span class="dot ok"></span>已独占`
+      : `<span class="dot bad"></span>未独占`;
+    $('#devline').textContent = s.device_path
+      ? `${s.device_path}  ·  内核记录 ${s.event_fmt_bytes ?? '?'} 字节  ·  压力上限 ${s.raw_max ?? '?'}`
+      : '守护进程未连接设备';
+  }catch(e){
+    $('#s-dev').innerHTML = '<span class="dot bad"></span>离线';
+  }
+}
+
+/* ================= 保存 ================= */
+$('#btn-apply').addEventListener('click', async () => {
+  try{
+    $('#btn-apply').disabled = true;
+    const r = await api('/api/config', CFG);
+    setMsg('已保存并生效' + (r.path ? `  →  ${r.path}` : ''), 'ok');
+    CFG = r.config;
+    renderKeys(); draw(); syncSliders(); updateReadout();
+  }catch(e){
+    setMsg('保存失败: ' + e.message, 'err');
+  }finally{
+    $('#btn-apply').disabled = false;
+  }
+});
+
+$('#btn-reload').addEventListener('click', load);
+
+function setMsg(t, cls){
+  const m = $('#msg');
+  m.textContent = t;
+  m.className = 'msg' + (cls ? ' ' + cls : '');
+}
+
+/* ================= 启动 ================= */
+async function load(){
+  try{
+    const st = await api('/api/state');
+    CFG = st.config;
+    STATUS = st.status;
+    renderKeys(); draw(); syncSliders(); updateReadout();
+    if(!CFG.buttons.suppress_firmware_keys){
+      $('#warn').innerHTML = '<div class="warnbox"><b>固件按键未被屏蔽。</b>' +
+        '按板子侧键时会同时打出字母（B / E），可能在输入框里产生多余字符。</div>';
+    } else {
+      $('#warn').innerHTML = '';
+    }
+    setMsg('已载入配置');
+  }catch(e){
+    setMsg('无法连接守护进程: ' + e.message, 'err');
+    $('#devline').textContent = '守护进程未运行？';
+  }
+}
+
+load();
+setInterval(poll, 1000);
+window.addEventListener('resize', () => { fitCanvas(); draw(); });
+fitCanvas();
+</script>
+</body>
+</html>

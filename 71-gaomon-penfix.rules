@@ -1,0 +1,21 @@
+# gaomon-penfix udev 规则
+#
+# 1) 屏蔽 GAOMON 1060PRO 原生笔节点
+#    内核 hid-generic 解不出两侧键（下键→STYLUS，上键被错误上报成 TOUCH），
+#    用 LIBINPUT_IGNORE_DEVICE 让 libinput（进而 KWin/Xournal++）忽略它，
+#    只使用 penfix 合成的那一个笔设备。
+#    精确匹配设备名，不会误伤名为 "GAOMON 1060PRO Pen (penfix)" 的虚拟设备。
+ACTION=="add", SUBSYSTEM=="input", ATTRS{name}=="GAOMON GAOMON_Tablet_1060PRO Pen", ENV{LIBINPUT_IGNORE_DEVICE}="1"
+
+# 2) 让虚拟笔对当前登录用户可读
+#    uinput 设备挂在 /devices/virtual/input/ 下。注意：virtual 总线设备拿不到
+#    ID_SEAT，因此 73-seat-late.rules 的 uaccess 逻辑不会为它们生成 ACL ——
+#    TAG+="uaccess" 只是尽力而为，真正生效的是 MODE="0666"。
+#    若无此规则，设备默认落成 root:input 0660，非 root 的 KWin / Xournal++
+#    读不到，表现就是「笔能悬停但画不出线」。
+#    另有一层兜底：守护进程以 root 运行时会在设备创建后自行 chmod 0666。
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="GAOMON 1060PRO Pen (penfix)", MODE="0666", TAG+="uaccess"
+
+# 3) 关闭 USB 自动挂起
+#    空闲自动挂起会让 hidraw 读到 EIO，导致虚拟笔反复断开重建。
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="256c", ATTR{idProduct}=="2004", ATTR{power/control}="on", ATTR{power/autosuspend}="-1"
