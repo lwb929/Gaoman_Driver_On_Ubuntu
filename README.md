@@ -1,13 +1,73 @@
 # Gaoman_Driver_On_Ubuntu
 
-<<<<<<< HEAD
-# Gaoman_Driver_On_Ubuntu
 An unofficial driver and adapter for the Gaomon 1060 Pro tablet, featuring a built-in WebUI for configuring mapping, pressure curves, and button bindings. Includes portrait/vertical screen adaptation for subscreen. Open source and cross-platform.
-=======
-# gaomon-penfix
 
-让 GAOMON 1060PRO（USB `256c:2004`）数位板配套用笔的**两个侧键**在 Linux 上可用，
-并修正内核 `hid-generic` 对这支笔的错误解码。
+一套让 GAOMON 1060PRO（USB `256c:2004`）在 Ubuntu + KDE Plasma Wayland 上
+完整工作的用户态驱动：笔迹跟随、真实压感、笔侧键/板面物理按键可自定义映射，
+并带一个零依赖的 WebUI 控制台（压感曲线 / 按键映射 / 多屏映射）。
+
+## 思路
+
+内核 `hid-uclogic` 不认识这块板（`256c:2004` 不在 ID 表），设备落在
+`hid-generic` 上，固件的真实报告布局（笔侧键挤在"笔尖"位等）被错误解码。
+与其跟内核搏斗（DKMS / 打补丁 / 修驱动 ID 表，内核一升级就全报废），
+不如**让内核继续按它的方式解码，我们在用户态旁路接管**：
+
+1. udev 规则把原生笔节点对 libinput 隐藏（`LIBINPUT_IGNORE_DEVICE`）；
+2. 守护进程直接读 hidraw **原始报告**（10 字节帧：bit0=笔尖 bit1=下键 bit2=上键
+   + X/Y/压力/倾斜），按帧重写后写入一只 uinput 合成的**虚拟笔**；
+3. 压感曲线、按键映射、多屏坐标全部在这一层加工，KWin / Xournal++ 只看到虚拟笔。
+
+不动内核、无 DKMS、不碰官方驱动的配置文件；卸载 = 删几个文件 + 拔插 USB。
+
+### 两个必须知道的坑（也是本项目最脆弱的两处）
+
+**1. `input_event` 记录长度**：本机内核是 24 字节（64 位 `timeval`），按 16 字节
+打包写入会导致 X/Y/倾斜全部错位，且**短写不抛异常**（`os.write` 只返回被接受的
+字节数）——必须用"写 2 条 16B 记录看返回 32 还是 24"来探测。
+
+**2. 虚拟设备权限**：uinput 虚拟设备拿不到 udev `uaccess` 的 ACL，默认
+`root:input 0660`，普通用户的 KWin 读不到——表现为"能悬停但画不出线"。
+两层兜底：udev 规则 `MODE="0666"` + 守护进程创建设备后自行 `chmod 0666`。
+
+## 适用场景
+
+- Xournal++ / Krita / GIMP 等 Wayland 下需要**压感**和**笔侧键切换工具**（橡皮擦/荧光笔）的书写绘画；
+- KDE Plasma **多显示器**：板子映射到指定屏幕，竖屏（Rotated90）直接用，
+  或投影到竖屏的**上半/下半**做横向书写（半屏横向投影）；
+- 板面物理按键（12 键）映射成键盘快捷键 / 鼠标键 / 滚轮 / 命令 / 禁用；
+- 官方 Linux 驱动不可用或与其冲突时作为**替代品**（两者只能二选一，见下文）。
+
+## 实测设备
+
+| 项目 | 实测环境 |
+|---|---|
+| 数位板 | GAOMON 1060PRO（`lsusb`: `256c:2004 GAOMON_Tablet_1060PRO`）|
+| 系统 | Ubuntu，内核 `7.0.0-43-generic`（24 字节 `input_event`）|
+| 桌面 | KDE Plasma 6 / Wayland（KWin），libinput |
+| 应用 | Xournal++（压感 + 侧键切换工具）|
+| 显示器 | 笔记本 eDP-1 1920x1080 + 外接 HDMI-A-1 1920x1080（`Rotated90` 竖屏）|
+| 多屏验证 | kcminputrc `OutputUuid` 映射、竖屏半屏横向投影（行为实测进行中）|
+
+> 其它 GAOMON/Huion 系（256c:xxxx）大概率可用但未实测；内核若为 16 字节
+> `input_event`，启动时的探测会自动适配。
+
+## How to use
+
+```bash
+# 安装（不影响现状，末尾自动自检）
+sudo bash install.sh
+# 激活接管 + 拔插一次 USB 线
+sudo bash activate.sh
+# 打开控制台
+http://127.0.0.1:8848/
+```
+
+WebUI 三张卡片：**压感曲线**（拖控制点，实时热生效）、**物理按键映射**
+（点「学习」再按目标键，自动识别键码）、**多屏映射**（选目标屏 / 旋转 /
+板面区域框选 / 目标屏内投影区域，保存即写入 KDE 配置并重建设备）。
+
+卸载：`sudo bash uninstall.sh`，配置文件保留在 `~/.config/gaomon-penfix/`。
 
 ## 问题
 
@@ -50,7 +110,7 @@ udev 的 `uaccess` 逻辑不会为它们生成 ACL，设备默认落成 `root:in
 两层兜底：udev 规则 `MODE="0666"`；守护进程以 root 运行时还会在设备创建后自行
 `chmod 0666`（`_fix_node_perms()`），不依赖 udev 是否及时。
 
-## 使用
+## 使用（详细）
 
 ```bash
 sudo bash install.sh     # 安装（不影响现状），末尾自动跑 --selftest
@@ -304,4 +364,3 @@ resolution 字段，导致 udev 算出 `ID_INPUT_WIDTH_MM=7`、`HEIGHT_MM=4`，�
   hidraw 读不到数据。
 - WebUI 无鉴权，因此只绑 `127.0.0.1`。**不要**改成 `0.0.0.0`。
 - `cmd` 动作会以守护进程身份（root）执行 shell 命令。只在明确知道自己配了什么时使用。
->>>>>>> 0113704 (GAOMON 1060PRO penfix：压感曲线/按键映射/WebUI/多屏映射)
