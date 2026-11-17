@@ -200,11 +200,16 @@ def normalize_buttons(b):
                                              d['suppress_firmware_keys'])),
         'map': {},
     }
+    # 默认映射打底，用户已保存的条目覆盖同键。
+    # （否则旧版配置文件里的空 map 会把新增的 pen_b1/pen_b2 默认抹掉——
+    #   实际发生过：升级后侧键"失效"。想禁用某键请配成 type:none。）
     m = b.get('map')
     if isinstance(m, dict):
         for k, v in m.items():
             if isinstance(v, dict):
                 out['map'][str(k)] = v
+    for k, v in d['map'].items():
+        out['map'].setdefault(k, v)
     return out
 
 
@@ -252,8 +257,9 @@ def normalize(cfg):
     out['buttons'] = normalize_buttons(cfg.get('buttons'))
     out['map'] = normalize_map(cfg.get('map'))
     labels = cfg.get('labels')
-    out['labels'] = {str(k): str(v) for k, v in labels.items()} \
+    user_labels = {str(k): str(v) for k, v in labels.items()} \
         if isinstance(labels, dict) else {}
+    out['labels'] = {**DEFAULT_CONFIG['labels'], **user_labels}
     return out
 
 

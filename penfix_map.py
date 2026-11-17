@@ -55,13 +55,28 @@ def parse_kscreen(text):
 
 
 def read_outputs(timeout=2.0):
-    """实时读当前输出布局。kscreen-doctor 不存在或失败返回 []。"""
+    """实时读当前输出布局。kscreen-doctor 不存在或失败返回 []。
+
+    systemd root 服务里没有 Wayland 会话环境，kscreen-doctor 会直接
+    abort（Qt fatal）。这里自动探测 /run/user/*/wayland-* 借用用户会话。
+    """
     exe = shutil.which('kscreen-doctor')
     if not exe:
         return []
+    env = dict(os.environ)
+    if 'WAYLAND_DISPLAY' not in env and not env.get('DISPLAY'):
+        import glob as _g
+        for wl in sorted(_g.glob('/run/user/*/wayland-*'),
+                         key=os.path.getmtime, reverse=True):
+            uid = wl.split('/')[3]
+            if wl.endswith('.lock'):
+                continue
+            env['XDG_RUNTIME_DIR'] = f'/run/user/{uid}'
+            env['WAYLAND_DISPLAY'] = os.path.basename(wl)
+            break
     try:
         r = subprocess.run([exe, '-o'], capture_output=True, text=True,
-                           timeout=timeout)
+                           timeout=timeout, env=env)
         return parse_kscreen(r.stdout or '')
     except (OSError, subprocess.TimeoutExpired):
         return []
