@@ -175,6 +175,7 @@ class ButtonMapper:
         self._mouse = None
         self._lock = threading.Lock()
         self._held = set()            # 当前按下的源键码
+        self._sw = {}                 # switch 动作的交替状态（按 act 的 id 记）
         self._learn = None            # 学习模式回调
         self.last_event = None        # 最近一次按键，供状态查询
         self.event_count = 0
@@ -360,6 +361,31 @@ class ButtonMapper:
     def _run_action(self, act, down):
         typ = act.get('type')
         if typ == 'none' or typ is None:
+            return
+        if typ == 'hold':
+            # 按住语义：按下 tap combo（切到目标工具），松开 tap combo2（还原）
+            combo = act.get('combo') if down else act.get('combo2')
+            if not combo:
+                return
+            try:
+                codes = parse_combo(combo)
+            except ValueError as e:
+                self.log(f'组合键无效: {combo} ({e})')
+                return
+            self._tap(codes)
+            return
+        if typ == 'switch':
+            # 交替 tap：每次按下在 combo / combo2 之间切换（按住无重复）
+            if not down:
+                return
+            combo = act.get('combo2') if self._sw.get(id(act)) else act.get('combo')
+            self._sw[id(act)] = not self._sw.get(id(act), False)
+            try:
+                codes = parse_combo(combo or '')
+            except ValueError as e:
+                self.log(f'组合键无效: {combo} ({e})')
+                return
+            self._tap(codes)
             return
         if typ == 'key':
             try:

@@ -535,6 +535,8 @@ $('#btn-reset-pts').addEventListener('click', () => {
 /* ================= 按键 ================= */
 const ACTIONS = [
   ['none','— 无动作（吞掉）'],
+  ['hold','按住切换，松开还原（如橡皮↔笔）'],
+  ['switch','交替切换（按一下换工具，再按换回）'],
   ['key','键盘组合键'],
   ['mouse','鼠标按键'],
   ['wheel','滚轮'],
@@ -602,7 +604,18 @@ function wireKey(el){
     const t = sel.value;
     act.type = t;
     el.classList.toggle('bound', t !== 'none');
-    if(t === 'key'){
+    if(t === 'hold' || t === 'switch'){
+      const ph = t === 'hold' ? ['按住时(如 ctrl+shift+e)', '松开时(如 ctrl+shift+p)']
+                              : ['第一次按(如 ctrl+shift+e)', '第二次按(如 ctrl+shift+p)'];
+      extra.innerHTML =
+        `<input type="text" placeholder="${ph[0]}" data-f="combo" style="width:46%">
+         <input type="text" placeholder="${ph[1]}" data-f="combo2" style="width:46%">`;
+      const i1 = extra.querySelector('[data-f="combo"]');
+      const i2 = extra.querySelector('[data-f="combo2"]');
+      i1.value = act.combo || ''; i2.value = act.combo2 || '';
+      i1.addEventListener('input', () => { act.combo = i1.value; });
+      i2.addEventListener('input', () => { act.combo2 = i2.value; });
+    } else if(t === 'key'){
       extra.innerHTML = `<input type="text" placeholder="如 ctrl+z" data-f="combo">`;
       const inp = extra.querySelector('[data-f="combo"]');
       inp.value = act.combo || '';
