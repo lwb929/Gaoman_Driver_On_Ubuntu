@@ -44,20 +44,13 @@ DEFAULT_CONFIG = {
         # 是否屏蔽固件自带的键盘上报（现在按侧键会打出 B/E 字母）
         "suppress_firmware_keys": True,
         # 按键映射。key 是物理键标识，value 是动作。
-        # pen_b1 / pen_b2 是笔的两个侧键（下/上），动作经虚拟键盘发出。
-        # "dual" = 两种模式共存：
-        #   短按 → 切到橡皮，再短按 → 换回笔（交替）；
-        #   从笔状态按住不放 → 保持橡皮，松开自动回笔。
-        # 默认用 Xournal++ 内置工具快捷键。（焦点需在 Xournal++；
-        # 删除映射项即恢复原样透传。）
-        # pen_b2 上侧键：单击轮换笔迹粗细（Xournal++ 尺寸档 Ctrl+1..5，
-        # 各档对应"很细→很粗"；若你的版本快捷键不同，在 WebUI 里改即可）
-        "map": {
-            "pen_b1": {"type": "dual", "combo": "ctrl+shift+e",
-                       "combo2": "ctrl+shift+p"},   # 下键：橡皮 ↔ 笔
-            "pen_b2": {"type": "cycle",
-                       "combos": ["ctrl+2", "ctrl+3", "ctrl+4", "ctrl+5"]},
-        },
+        # 笔侧键（BTN_STYLUS/2）默认**原样透传**给 Xournal++ —— 它自己的
+        # 输入按钮配置（Settings → 输入 → 按钮配置）原生支持"按住临时切换
+        # 工具、松开还原"；而 xournalpp 1.3.x 没有工具切换/笔尺寸的键盘
+        # 快捷键（ActionProperties.h 仅剪贴板/缩放），键盘方案无效。
+        # 一键配置 Xournal++ 侧键：bash setup-xournal-buttons.sh
+        # 如想用虚拟键盘动作（对有快捷键的应用有效），可在此自加条目。
+        "map": {},
     },
 
     # 多屏映射（板面 -> 哪块显示器）-------------------------------------------
@@ -77,10 +70,7 @@ DEFAULT_CONFIG = {
     },
 
     # 界面上展示的按键顺序与别名（由探测填充，也可手工改）
-    "labels": {
-        "pen_b1": "笔·下侧键",
-        "pen_b2": "笔·上侧键",
-    },
+    "labels": {},
 }
 
 
