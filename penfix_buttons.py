@@ -175,7 +175,9 @@ class ButtonMapper:
         self._mouse = None
         self._lock = threading.Lock()
         self._held = set()            # 当前按下的源键码
-        self._sw = {}                 # switch 动作的交替状态（按 act 的 id 记）
+        self._sw = {}                 # switch/dual 动作的交替状态（按 act 的 id 记）
+        self._dual_t0 = {}            # dual：按下时刻
+        self._dual_pending = {}       # dual：按下时已是橡皮态的挂起标记
         self._learn = None            # 学习模式回调
         self.last_event = None        # 最近一次按键，供状态查询
         self.event_count = 0
@@ -362,6 +364,30 @@ class ButtonMapper:
         typ = act.get('type')
         if typ == 'none' or typ is None:
             return
+        if typ == 'dual':
+            # 短按切换 + 按住临时使用的组合语义：
+            #   down 且当前是笔态 → tap combo（切到橡皮）
+            #   down 且已是橡皮态 → 暂不动作（等抬起时长判定）
+            #   up 短按（<0.3s）且已是橡皮态 → tap combo2（换回笔）
+            #   up 长按且本次按下时刚切过去 → tap combo2（按住松开还原）
+            if down:
+                self._dual_t0[id(act)] = time.time()
+                if not self._sw.get(id(act)):
+                    self._tap_by(act, 'combo')
+                    self._sw[id(act)] = True
+                else:
+                    self._dual_pending[id(act)] = True
+                return
+            t0 = self._dual_t0.pop(id(act), None)
+            pending = self._dual_pending.pop(id(act), False)
+            long_held = t0 is not None and (time.time() - t0) >= 0.3
+            if self._sw.get(id(act)):
+                if pending and not long_held:
+                    self._tap_by(act, 'combo2'); self._sw[id(act)] = False
+                elif not pending and long_held:
+                    self._tap_by(act, 'combo2'); self._sw[id(act)] = False
+                # 其余情形：短按后保持橡皮 / 橡皮态长按保持橡皮
+            return
         if typ == 'hold':
             # 按住语义：按下 tap combo（切到目标工具），松开 tap combo2（还原）
             combo = act.get('combo') if down else act.get('combo2')
@@ -423,6 +449,14 @@ class ButtonMapper:
                                      stderr=subprocess.DEVNULL)
                 except Exception as e:
                     self.log(f'命令执行失败: {e}')
+
+    def _tap_by(self, act, key):
+        try:
+            codes = parse_combo(act.get(key, ''))
+        except ValueError as e:
+            self.log(f'组合键无效: {act.get(key)} ({e})')
+            return
+        self._tap(codes)
 
     def _tap(self, codes):
         """完整按下+抬起，带 30ms 间隔，模拟真实敲击。"""

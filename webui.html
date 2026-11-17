@@ -535,8 +535,9 @@ $('#btn-reset-pts').addEventListener('click', () => {
 /* ================= 按键 ================= */
 const ACTIONS = [
   ['none','— 无动作（吞掉）'],
+  ['dual','短按切换 + 按住临时用，松开还原（推荐）'],
   ['hold','按住切换，松开还原（如橡皮↔笔）'],
-  ['switch','交替切换（按一下换工具，再按换回）'],
+  ['switch','纯短按交替（按一下换，再按换回）'],
   ['key','键盘组合键'],
   ['mouse','鼠标按键'],
   ['wheel','滚轮'],
@@ -604,7 +605,7 @@ function wireKey(el){
     const t = sel.value;
     act.type = t;
     el.classList.toggle('bound', t !== 'none');
-    if(t === 'hold' || t === 'switch'){
+    if(t === 'hold' || t === 'switch' || t === 'dual'){
       const ph = t === 'hold' ? ['按住时(如 ctrl+shift+e)', '松开时(如 ctrl+shift+p)']
                               : ['第一次按(如 ctrl+shift+e)', '第二次按(如 ctrl+shift+p)'];
       extra.innerHTML =

@@ -45,14 +45,16 @@ DEFAULT_CONFIG = {
         "suppress_firmware_keys": True,
         # 按键映射。key 是物理键标识，value 是动作。
         # pen_b1 / pen_b2 是笔的两个侧键（下/上），动作经虚拟键盘发出。
-        # "hold" = 按下 tap combo 切到目标工具，松开 tap combo2 还原
-        # （如橡皮↔笔）。默认用 Xournal++ 内置工具快捷键。
-        # （前提：焦点在 Xournal++；删除映射项即恢复原样透传。）
+        # "dual" = 两种模式共存：
+        #   短按 → 切到橡皮，再短按 → 换回笔（交替）；
+        #   从笔状态按住不放 → 保持橡皮，松开自动回笔。
+        # 默认用 Xournal++ 内置工具快捷键。（焦点需在 Xournal++；
+        # 删除映射项即恢复原样透传。）
         "map": {
-            "pen_b1": {"type": "hold", "combo": "ctrl+shift+e",
-                       "combo2": "ctrl+shift+p"},   # 下键：按住橡皮，松开回笔
-            "pen_b2": {"type": "hold", "combo": "ctrl+shift+h",
-                       "combo2": "ctrl+shift+p"},   # 上键：按住荧光笔，松开回笔
+            "pen_b1": {"type": "dual", "combo": "ctrl+shift+e",
+                       "combo2": "ctrl+shift+p"},   # 下键：橡皮 ↔ 笔
+            "pen_b2": {"type": "dual", "combo": "ctrl+shift+h",
+                       "combo2": "ctrl+shift+p"},   # 上键：荧光笔 ↔ 笔
         },
     },
 
