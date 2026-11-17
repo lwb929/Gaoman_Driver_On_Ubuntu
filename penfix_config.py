@@ -43,8 +43,14 @@ DEFAULT_CONFIG = {
         "enabled": True,
         # 是否屏蔽固件自带的键盘上报（现在按侧键会打出 B/E 字母）
         "suppress_firmware_keys": True,
-        # 按键映射。key 是物理键标识，value 是动作
-        "map": {},
+        # 按键映射。key 是物理键标识，value 是动作。
+        # pen_b1 / pen_b2 是笔的两个侧键（下/上），动作经虚拟键盘发出——
+        # 默认用 Xournal++ 内置快捷键切换工具（前提：焦点在 Xournal++；
+        # 按住侧键会触发键盘自动重复，属正常）。
+        "map": {
+            "pen_b1": {"type": "key", "combo": "ctrl+shift+e"},  # 下键 → 橡皮
+            "pen_b2": {"type": "key", "combo": "ctrl+shift+h"},  # 上键 → 荧光笔
+        },
     },
 
     # 多屏映射（板面 -> 哪块显示器）-------------------------------------------
@@ -64,7 +70,10 @@ DEFAULT_CONFIG = {
     },
 
     # 界面上展示的按键顺序与别名（由探测填充，也可手工改）
-    "labels": {},
+    "labels": {
+        "pen_b1": "笔·下侧键",
+        "pen_b2": "笔·上侧键",
+    },
 }
 
 

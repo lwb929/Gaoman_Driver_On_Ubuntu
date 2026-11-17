@@ -327,12 +327,22 @@ class PenProxy:
             evs += [(EV_ABS, ABS_X, int(x)), (EV_ABS, ABS_Y, int(y)),
                     (EV_ABS, ABS_PRESSURE, int(round(p))),
                     (EV_ABS, ABS_TILT_X, int(round(tx))), (EV_ABS, ABS_TILT_Y, int(round(ty)))]
-        if b1 != self.b1:
-            self.b1 = b1
-            evs.append((EV_KEY, BTN_STYLUS, int(b1)))
-        if b2 != self.b2:
-            self.b2 = b2
-            evs.append((EV_KEY, BTN_STYLUS2, int(b2)))
+        if b1 != self.b1 or b2 != self.b2:
+            # 侧键映射：配置了 pen_b1/pen_b2 时拦截侧键，转为虚拟键盘动作
+            # （默认 ctrl+shift+e / ctrl+shift+h，即 Xournal++ 的工具切换快捷键）
+            pmap = getattr(self, 'pen_map', None)
+            trigger = getattr(self, 'pen_trigger', None)
+            if pmap and trigger:
+                if b1 != self.b1 and 'pen_b1' in pmap:
+                    trigger('pen_b1', b1)
+                if b2 != self.b2 and 'pen_b2' in pmap:
+                    trigger('pen_b2', b2)
+            else:
+                if b1 != self.b1:
+                    evs.append((EV_KEY, BTN_STYLUS, int(b1)))
+                if b2 != self.b2:
+                    evs.append((EV_KEY, BTN_STYLUS2, int(b2)))
+            self.b1, self.b2 = b1, b2
         if evs:
             self.w.write_events(evs)
             self.n_write += 1
@@ -541,6 +551,8 @@ def main():
         proxy.stop()
         proxy = PenProxy(no_motion=args.no_motion, curve=curve,
                          mapfn=outmap.map)
+        proxy.pen_map = (cfg['buttons'].get('map') or {}) if mapper else {}
+        proxy.pen_trigger = mapper.trigger if mapper else None
         proxy.start(axes)
 
     # 启动时把配置落到的 kcminputrc 状态对齐（幂等；重启后仍有效）
@@ -570,7 +582,10 @@ def main():
     mapper = None
     if not args.no_buttons and cfg['buttons'].get('enabled', True):
         mapper = B.ButtonMapper(cfg['buttons'], log=log)
-        if not mapper.start():
+        if mapper.start():
+            proxy.pen_map = cfg['buttons'].get('map') or {}
+            proxy.pen_trigger = mapper.trigger
+        else:
             log('按键映射未启动（不影响笔功能）')
             mapper = None
 
@@ -623,12 +638,14 @@ def main():
             if mapper:
                 mapper.stop()
                 mapper = None
-            if new_cfg['buttons'].get('enabled', True):
+            if new_cfg['buttons'].get('enabled', True) and not args.no_buttons:
                 m = B.ButtonMapper(new_cfg['buttons'], log=log)
                 if m.start():
                     mapper = m
                 else:
                     mapper = None
+            proxy.pen_map = (new_cfg['buttons'].get('map') or {}) if mapper else {}
+            proxy.pen_trigger = mapper.trigger if mapper else None
             log('已热重载按键映射')
 
         W.STATE['get_status'] = get_status

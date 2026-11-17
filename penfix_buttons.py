@@ -202,16 +202,15 @@ class ButtonMapper:
         if self._running:
             return True
         dev = self.device_override or self.find_tablet_keyboard()
-        if not dev:
-            self.log('按键映射：未找到板子键盘节点，跳过')
-            return False
-        try:
-            fd = os.open(dev, os.O_RDONLY | os.O_NONBLOCK)
-        except OSError as e:
-            self.log(f'按键映射：打开 {dev} 失败: {e}')
-            return False
+        fd = None
         grabbed = False
-        if self.cfg.get('suppress_firmware_keys', True):
+        if dev:
+            try:
+                fd = os.open(dev, os.O_RDONLY | os.O_NONBLOCK)
+            except OSError as e:
+                self.log(f'按键映射：打开 {dev} 失败: {e}')
+                fd = None
+        if fd is not None and self.cfg.get('suppress_firmware_keys', True):
             try:
                 fcntl.ioctl(fd, EVIOCGRAB, 1)
                 grabbed = True
@@ -238,10 +237,51 @@ class ButtonMapper:
             return False
 
         self._running = True
-        self._thread = threading.Thread(target=self._loop, daemon=True)
-        self._thread.start()
-        self.log(f'按键映射已启动：{dev} (grab={grabbed})，映射 {len(self.cfg.get("map") or {})} 项')
+        if fd is not None:
+            self._thread = threading.Thread(target=self._loop, daemon=True)
+            self._thread.start()
+            self.log(f'按键映射已启动：{dev} (grab={grabbed})，映射 '
+                     f'{len(self.cfg.get("map") or {})} 项')
+        else:
+            # keyboard-less 模式：无板键线程，但仍创建虚拟键盘供笔侧键动作使用
+            self.log('按键映射：未找到板子键盘节点（仅笔侧键映射可用）')
         return True
+
+    def trigger(self, name, down):
+        """由笔侧键等非键盘源触发的动作入口。name 是 map 里的键（如 pen_b1）。"""
+        with self._lock:
+            if not self.cfg.get('enabled', True):
+                return False
+            act = (self.cfg.get('map') or {}).get(name)
+        if not act or not isinstance(act, dict):
+            return False
+        if self._kbd is None:
+            self._ensure_kbd()
+        if self._kbd is None:
+            return False
+        self.last_event = {'code': name, 'name': name, 'value': 1 if down else 0,
+                           't': time.time()}
+        self.event_count += 1
+        self._run_action(act, down)
+        return True
+
+    def _ensure_kbd(self):
+        """懒创建虚拟键盘（trigger 在 mapper 未 start 时也能用）。"""
+        all_keys = set()
+        for act in (self.cfg.get('map') or {}).values():
+            if isinstance(act, dict) and act.get('type') == 'key':
+                try:
+                    all_keys.update(parse_combo(act.get('combo', '')))
+                except ValueError:
+                    pass
+        all_keys.update(MOUSE_CODES.values())
+        try:
+            self._kbd = UInputDev('GAOMON 1060PRO Keys (penfix)',
+                                  keys=sorted(all_keys),
+                                  rels=(REL_X, REL_Y, REL_WHEEL))
+        except OSError as e:
+            self.log(f'按键映射：创建 uinput 设备失败: {e}')
+            self._kbd = None
 
     def stop(self):
         self._running = False
