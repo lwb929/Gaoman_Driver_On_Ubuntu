@@ -50,11 +50,13 @@ DEFAULT_CONFIG = {
         #   从笔状态按住不放 → 保持橡皮，松开自动回笔。
         # 默认用 Xournal++ 内置工具快捷键。（焦点需在 Xournal++；
         # 删除映射项即恢复原样透传。）
+        # pen_b2 上侧键：单击轮换笔迹粗细（Xournal++ 尺寸档 Ctrl+1..5，
+        # 各档对应"很细→很粗"；若你的版本快捷键不同，在 WebUI 里改即可）
         "map": {
             "pen_b1": {"type": "dual", "combo": "ctrl+shift+e",
                        "combo2": "ctrl+shift+p"},   # 下键：橡皮 ↔ 笔
-            "pen_b2": {"type": "dual", "combo": "ctrl+shift+h",
-                       "combo2": "ctrl+shift+p"},   # 上键：荧光笔 ↔ 笔
+            "pen_b2": {"type": "cycle",
+                       "combos": ["ctrl+2", "ctrl+3", "ctrl+4", "ctrl+5"]},
         },
     },
 

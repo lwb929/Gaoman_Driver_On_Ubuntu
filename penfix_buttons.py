@@ -178,6 +178,8 @@ class ButtonMapper:
         self._sw = {}                 # switch/dual 动作的交替状态（按 act 的 id 记）
         self._dual_t0 = {}            # dual：按下时刻
         self._dual_pending = {}       # dual：按下时已是橡皮态的挂起标记
+        self._gest = {}               # gestures：每动作的手势状态
+        self._gest_timers = {}        # gestures：长按/连击链定时器
         self._learn = None            # 学习模式回调
         self.last_event = None        # 最近一次按键，供状态查询
         self.event_count = 0
@@ -290,6 +292,9 @@ class ButtonMapper:
         self._running = False
         if self._thread:
             self._thread.join(timeout=2)
+        for t in self._gest_timers.values():
+            t.cancel()
+        self._gest_timers.clear()
         self._cleanup_fd()
         if self._kbd:
             self._kbd.close()
@@ -363,6 +368,85 @@ class ButtonMapper:
     def _run_action(self, act, down):
         typ = act.get('type')
         if typ == 'none' or typ is None:
+            return
+        if typ == 'cycle':
+            # 轮换：每次按下 tap combos 里的下一个组合
+            if not down:
+                return
+            combos = act.get('combos') or []
+            if not combos:
+                return
+            i = self._sw.get(id(act), 0) % len(combos)
+            try:
+                codes = parse_combo(combos[i])
+            except ValueError as e:
+                self.log(f'组合键无效: {combos[i]} ({e})')
+                return
+            self._sw[id(act)] = i + 1
+            self._tap(codes)
+            return
+        if typ == 'gestures':
+            # 手势：单击 / 长按(默认0.3s) / 连续点击N次，各自可配组合键
+            act_id = id(act)
+            th = float(act.get('threshold', 0.3))
+            if down:
+                st = self._gest.setdefault(act_id, {})
+                st['t0'] = time.time()
+                st['fired'] = False
+                def fire_hold():
+                    with self._lock:
+                        if self._gest.get(act_id, {}).get('fired') is False:
+                            self._gest[act_id]['fired'] = True
+                            c = act.get('hold')
+                            if c:
+                                try:
+                                    self._tap(parse_combo(c))
+                                except ValueError:
+                                    pass
+                self._gest_timers[act_id] = threading.Timer(th, fire_hold)
+                self._gest_timers[act_id].start()
+                return
+            # 抬起
+            tmr = self._gest_timers.pop(act_id, None)
+            if tmr:
+                tmr.cancel()
+            st = self._gest.get(act_id, {})
+            if st.get('fired'):
+                return                          # 长按已触发，本次抬起不作为
+            dur = time.time() - st.get('t0', time.time())
+            if dur >= th:
+                c = act.get('hold')
+                if c:
+                    try:
+                        self._tap(parse_combo(c))
+                    except ValueError:
+                        pass
+                return
+            # 短按：进入连击链（链窗口 0.4s）
+            now = time.time()
+            if now - st.get('last_up', 0) > 0.4:
+                st['clicks'] = 0
+            st['clicks'] = st.get('clicks', 0) + 1
+            st['last_up'] = now
+            clicks = st['clicks']
+            need = int(act.get('multi_count', 2))
+            def fire_clicks():
+                with self._lock:
+                    c_n = st.get('clicks', 0)
+                    st['clicks'] = 0
+                    c = act.get('multi') if c_n >= max(2, need) else act.get('click')
+                    if not c and c_n >= 2:
+                        c = act.get('click')    # 未配连击时多次点击退化为单击
+                    if c:
+                        try:
+                            self._tap(parse_combo(c))
+                        except ValueError:
+                            pass
+            old = self._gest_timers.get(('chain', act_id))
+            if old:
+                old.cancel()
+            self._gest_timers[('chain', act_id)] = threading.Timer(0.4, fire_clicks)
+            self._gest_timers[('chain', act_id)].start()
             return
         if typ == 'dual':
             # 短按切换 + 按住临时使用的组合语义：

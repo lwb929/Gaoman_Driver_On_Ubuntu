@@ -536,6 +536,8 @@ $('#btn-reset-pts').addEventListener('click', () => {
 const ACTIONS = [
   ['none','— 无动作（吞掉）'],
   ['dual','短按切换 + 按住临时用，松开还原（推荐）'],
+  ['cycle','单击轮换（如轮换笔迹粗细档位）'],
+  ['gestures','手势：单击 / 长按 / 连续点击'],
   ['hold','按住切换，松开还原（如橡皮↔笔）'],
   ['switch','纯短按交替（按一下换，再按换回）'],
   ['key','键盘组合键'],
@@ -605,7 +607,34 @@ function wireKey(el){
     const t = sel.value;
     act.type = t;
     el.classList.toggle('bound', t !== 'none');
-    if(t === 'hold' || t === 'switch' || t === 'dual'){
+    if(t === 'cycle'){
+      extra.innerHTML =
+        `<input type="text" placeholder="逗号分隔，如 ctrl+2,ctrl+3,ctrl+4,ctrl+5" data-f="combos" style="width:100%">` +
+        `<div class="hint" style="margin-top:4px">每次单击依次执行下一个；Xournal++ 粗细档：ctrl+1(最细)…ctrl+5(最粗)</div>`;
+      const inp = extra.querySelector('[data-f="combos"]');
+      inp.value = (act.combos || []).join(',');
+      inp.addEventListener('input', () => {
+        act.combos = inp.value.split(',').map(s => s.trim()).filter(Boolean);
+      });
+    } else if(t === 'gestures'){
+      extra.innerHTML =
+        `<div class="hint">单击 / 长按(0.3s) / 连续点击N次，各配一个组合键，留空=不动作</div>` +
+        `<label style="display:grid;grid-template-columns:auto 1fr;gap:3px 8px;align-items:center">
+           <span class="hint">单击</span><input type="text" data-f="click" placeholder="如 ctrl+shift+p" style="width:100%">
+           <span class="hint">长按</span><input type="text" data-f="hold" placeholder="如 ctrl+shift+e" style="width:100%">
+           <span class="hint">连击${'×'}</span><input type="text" data-f="multi" placeholder="如 ctrl+shift+h" style="width:100%">
+           <span class="hint">次数</span><input type="number" min="2" max="5" data-f="multi_count" style="width:56px">
+         </label>`;
+      const bind = (f, v) => {
+        const el = extra.querySelector(`[data-f="${f}"]`);
+        el.value = v ?? '';
+        el.addEventListener('input', () => {
+          act[f] = f === 'multi_count' ? (parseInt(el.value, 10) || 2) : el.value;
+        });
+      };
+      bind('click', act.click); bind('hold', act.hold);
+      bind('multi', act.multi); bind('multi_count', act.multi_count ?? 2);
+    } else if(t === 'hold' || t === 'switch' || t === 'dual'){
       const ph = t === 'hold' ? ['按住时(如 ctrl+shift+e)', '松开时(如 ctrl+shift+p)']
                               : ['第一次按(如 ctrl+shift+e)', '第二次按(如 ctrl+shift+p)'];
       extra.innerHTML =
